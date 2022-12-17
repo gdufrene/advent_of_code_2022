@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 
 
@@ -12,16 +14,18 @@ public class Day17 implements AdventDay {
     
     public static void main(String[] args) throws Exception {
         new Day17()
-            .load( Filename.SAMPLE.filename() )
+            .load( Filename.DATA.filename() )
             .part2();
     }
     
     String commands;
+    int commandSize;
     PlayGround playGround = new PlayGround();
     
     
     public Day17 load(String f) throws IOException {
         commands = Files.readAllLines( dayFile(f) ).get(0);
+        commandSize = commands.length();
         return this;
     }
 
@@ -51,32 +55,90 @@ public class Day17 implements AdventDay {
         return solution;
     }
     
+    private record Cycle(long height, long fallen, int commandIndex) {
+        public String toString() {
+            return "height +"+height+", stopped +"+fallen;
+        }
+    }
+    
     public void part2() throws IOException {
         long todo = 1000000000000L;
-        int commandIndex = 0;
         
+        Cycle first = nextCycle(0, todo);
+        System.out.println(first);
+        todo -= first.fallen;
+        
+        Cycle then = nextCycle(first.fallen, todo);
+        System.out.println(then);
+        long totalCycle = (1000000000000L - first.fallen) / then.fallen;
+        long totalHeight = totalCycle * then.height + first.height;
+        todo -= totalCycle * then.fallen;
+        
+        Cycle last = nextCycle(first.fallen + then.fallen, todo);
+        System.out.println(last);
+        totalHeight += last.height; 
+        todo -= last.fallen;
+
+        System.out.println( todo );
+        
+        System.out.println();
+        // 1591977077383 false
+        // 1591977077358 false
+        // 1591977077352  YES
+        System.out.println("PART2 ====> " + totalHeight);
+        // return solution;
+    }
+    
+    public Cycle nextCycle(long fromStopped, long max) {
+        long stopped = 0L;
+        long beginHeight = 0;
+        long heightBeforeCycle = 0;
+        long stopBeforeCycle = 0;
+        int commandIndex = -1;
+        
+        playGround = new PlayGround();
         playGround.nextBlock();
-        while ( todo > 0 ) {
-            char c = commands.charAt(commandIndex);
-            boolean moved = false;
-            if ( c == '<' ) moved = playGround.moveLeft();
-            if ( c == '>' ) moved = playGround.moveRight();
-            if ( !playGround.moveDown() ) {
-                playGround.addBlockInCave();
-                todo--;
-                playGround.nextBlock();
-                if ( todo % 100000 == 0 ) {
-                    System.out.println( "todo ... " + todo );
-                }
-            }
+        
+        HashSet<Integer> cycles = new HashSet<Integer>(); 
+        
+        long stopAt = fromStopped + max;
+        while ( stopped < stopAt ) {
+            
             commandIndex++;
-            if ( commandIndex >= commands.length() ) commandIndex = 0;
+            if ( commandIndex >= commandSize ) {
+                commandIndex = 0;
+            }
+            
+            char c = commands.charAt(commandIndex);
+            if ( c == '<' ) playGround.moveLeft();
+            if ( c == '>' ) playGround.moveRight();
+            if ( !playGround.moveDown() ) {
+                stopped++;
+                playGround.addBlockInCave();
+                playGround.nextBlock();
+                // long height = playGround.totalHeight() - beginHeight;
+                // Cycle cycle = new Cycle(commandIndex, stopped);
+                if ( cycles.contains(commandIndex) ) {
+                    System.out.println("Loop at " + commandIndex + " ?");
+                    break;
+                }
+                heightBeforeCycle = playGround.totalHeight();
+                stopBeforeCycle = stopped;
+                if ( stopped == fromStopped )
+                    beginHeight = heightBeforeCycle;
+                if ( stopped > fromStopped )
+                    cycles.add(commandIndex);
+                
+                // System.out.println(commandIndex);
+                if ( stopped % 10000  == 0) System.out.println(". " + stopped);
+                if ( commandIndex == 0 ) { break; }
+            }
+
         }
         
-        long solution = playGround.totalHeight();
-        System.out.println();
-        System.out.println("PART2 ====> " + (solution));
-        // return solution;
+        long height = heightBeforeCycle - beginHeight;
+        long fallen = stopBeforeCycle - fromStopped;
+        return new Cycle(height, fallen, commandIndex);
     }
     
     
