@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 
 
@@ -116,10 +115,7 @@ public class Day17 implements AdventDay {
                 stopped++;
                 playGround.addBlockInCave();
                 playGround.nextBlock();
-                // long height = playGround.totalHeight() - beginHeight;
-                // Cycle cycle = new Cycle(commandIndex, stopped);
                 if ( cycles.contains(commandIndex) ) {
-                    System.out.println("Loop at " + commandIndex + " ?");
                     break;
                 }
                 heightBeforeCycle = playGround.totalHeight();
@@ -128,8 +124,6 @@ public class Day17 implements AdventDay {
                     beginHeight = heightBeforeCycle;
                 if ( stopped > fromStopped )
                     cycles.add(commandIndex);
-                
-                // System.out.println(commandIndex);
                 if ( stopped % 10000  == 0) System.out.println(". " + stopped);
                 if ( commandIndex == 0 ) { break; }
             }
