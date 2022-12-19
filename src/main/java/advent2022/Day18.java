@@ -177,6 +177,7 @@ public class Day18 implements AdventDay {
         System.out.println("touched: " + touched);
         
         // 2442 too low
+        // 2468 is OK
         System.out.println( "PART2 =====> " + exposed );
         
         return exposed;
