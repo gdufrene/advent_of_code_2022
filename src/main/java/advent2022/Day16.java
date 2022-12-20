@@ -6,38 +6,31 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
 public class Day16 implements AdventDay {
     
     private static Pattern pattern = Pattern.compile( 
-            "Valve ([A-Z]*) has flow rate=(\\d+); tunnel[s]? lead[s]? to valve[s]? (.*)"
+        "Valve ([A-Z]*) has flow rate=(\\d+); tunnel[s]? lead[s]? to valve[s]? (.*)"
     );
     
     
     public static void main(String[] args) throws Exception {
         new Day16()
-            .load( Filename.SAMPLE.filename() )
+            .load( Filename.DATA.filename() )
             .part1();
     }
     
     List<String> names = new ArrayList<>();
-    HashMap<String, Integer> flows  = new HashMap<>();
-    HashMap<String, List<String>> conn  = new HashMap<>();
+    HashMap<String, Integer> flows = new HashMap<>();
+    HashMap<String, List<String>> conn = new HashMap<>();
+    LinkedList<String> toOpens = new LinkedList<>();
     int[][] grid;
     Valve AA;
     
@@ -45,17 +38,15 @@ public class Day16 implements AdventDay {
         Files.lines( dayFile(f) )
             .map( pattern::matcher )
             .filter( Matcher::matches )
-            .map( m -> {
-                names.add( m.group(1) );
-                return m;
-            })
-            .map( m -> {
-                flows.put( m.group(1), parseInt(m.group(2)));
-                return m;
-            })
             .forEach( m -> {
-                conn.put(
-                    m.group(1), 
+                String name = m.group(1);
+                names.add( name );
+                int flow = parseInt(m.group(2));
+                flows.put( name, flow);
+                if (flow > 0) {
+                    toOpens.add(name);
+                }
+                conn.put( name, 
                     Stream.of( m.group(3).split(",") )
                         .map( String::trim )
                         .toList() );
@@ -66,30 +57,32 @@ public class Day16 implements AdventDay {
         for (int i = 0; i < grid.length; i++)
             for (int j = 0; j < grid.length; j++) 
                 grid[i][j] = 9999;
-
-        for (int i = 0; i < names.size(); i++) {
-            List<String> tunnels = conn.get( names.get(i) );
-            for (String tunnel : tunnels ) {
-                int j = names.indexOf(tunnel);
-                if ( j < 0 ) System.out.println( tunnel );
-                grid[i][j] = 1;
-                // System.out.println( i + " -> " + j + " :: " + grid[i][j] );
-            }
-        }
         
-        for (int i = 0; i < len; i++) {
-            for (int j = 0; j < len; j++) {
-                int min = 9999;
-                if ( i == j ) grid[i][j] = 0;
-                for (int k = 0; k < grid.length; k++) {
-                    int l = grid[i][k] + grid[k][j];
-                    if ( l < min ) min = l;
-                }
-                grid[i][j] = min;
-                // System.out.println( names.get(i) + " -> " + names.get(j) + " :: " + grid[i][j] );
+        List<String> computeDist = new LinkedList<>( toOpens );
+        computeDist.add("AA");
+        for( String node : computeDist ) {
+            LinkedList<String> visited = new LinkedList<>();
+            LinkedList<String> toVisit = new LinkedList<>();
+            HashMap<String, Integer> mins = new HashMap<>();
+            mins.put(node, 0);
+            toVisit.add(node);
+            while(!toVisit.isEmpty()) {
+                String n = toVisit.removeFirst();
+                final int _sum = mins.get(n) + 1;
+                visited.add(n);
+                conn.get(n)
+                    .forEach( k -> {
+                        mins.compute( k, (k1, v) -> {
+                            if ( v == null ) return _sum;
+                            return Math.min(v, _sum);
+                        });
+                        if (!visited.contains(k)) toVisit.add(k);
+                    });
             }
+            mins.forEach( (k, v) -> {
+                grid[names.indexOf(node)][names.indexOf(k)] = v;
+            });
         }
-        
         return this;
     }
 
@@ -99,19 +92,21 @@ public class Day16 implements AdventDay {
         
         ArrayList<String> backTrace = new ArrayList<>(); 
         int totalFlow = dfs( names.indexOf("AA"), 
-            flows.keySet().stream().filter(k -> flows.get(k) > 0 ).toList(),
+            toOpens,
             30,
             backTrace
         );
         
         System.out.println(backTrace);
         
+        System.out.println();
+        System.out.println("hitcache => "+hitCache);
+        
         // 1952 xxx
+        // 2087 is OK !!
         System.out.println();
         System.out.println("PART1 ====> " + totalFlow);
         
-        System.out.println();
-        System.out.println("hitcache => "+hitCache);
     }
     
     long hitCache = 0;
