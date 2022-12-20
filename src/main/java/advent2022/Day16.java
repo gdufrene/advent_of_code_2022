@@ -5,6 +5,7 @@ import static java.lang.Integer.parseInt;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,6 +24,10 @@ import java.util.stream.Stream;
 
 public class Day16 implements AdventDay {
     
+    private static Pattern pattern = Pattern.compile( 
+            "Valve ([A-Z]*) has flow rate=(\\d+); tunnel[s]? lead[s]? to valve[s]? (.*)"
+    );
+    
     
     public static void main(String[] args) throws Exception {
         new Day16()
@@ -30,212 +35,130 @@ public class Day16 implements AdventDay {
             .part1();
     }
     
-    List<Valve> valves;
-    HashMap<String, Valve> byName;
+    List<String> names = new ArrayList<>();
+    HashMap<String, Integer> flows  = new HashMap<>();
+    HashMap<String, List<String>> conn  = new HashMap<>();
+    int[][] grid;
     Valve AA;
     
     private Day16 load(String f) throws IOException {
-        byName = new HashMap<>();
-        valves = Files.lines( dayFile(f) )
-            .map(Valve::fromString)
-            .map( v -> {
-                byName.put(v.name, v);
-                return v;
+        Files.lines( dayFile(f) )
+            .map( pattern::matcher )
+            .filter( Matcher::matches )
+            .map( m -> {
+                names.add( m.group(1) );
+                return m;
             })
-            .toList();
-        AA = byName.get("AA");
+            .map( m -> {
+                flows.put( m.group(1), parseInt(m.group(2)));
+                return m;
+            })
+            .forEach( m -> {
+                conn.put(
+                    m.group(1), 
+                    Stream.of( m.group(3).split(",") )
+                        .map( String::trim )
+                        .toList() );
+            });
+        
+        int len = names.size();
+        grid = new int[len][len];
+        for (int i = 0; i < grid.length; i++)
+            for (int j = 0; j < grid.length; j++) 
+                grid[i][j] = 9999;
+
+        for (int i = 0; i < names.size(); i++) {
+            List<String> tunnels = conn.get( names.get(i) );
+            for (String tunnel : tunnels ) {
+                int j = names.indexOf(tunnel);
+                if ( j < 0 ) System.out.println( tunnel );
+                grid[i][j] = 1;
+                // System.out.println( i + " -> " + j + " :: " + grid[i][j] );
+            }
+        }
+        
+        for (int i = 0; i < len; i++) {
+            for (int j = 0; j < len; j++) {
+                int min = 9999;
+                if ( i == j ) grid[i][j] = 0;
+                for (int k = 0; k < grid.length; k++) {
+                    int l = grid[i][k] + grid[k][j];
+                    if ( l < min ) min = l;
+                }
+                grid[i][j] = min;
+                // System.out.println( names.get(i) + " -> " + names.get(j) + " :: " + grid[i][j] );
+            }
+        }
+        
         return this;
     }
 
     public void part1() throws IOException {
-        valves
-            .stream()
-            .map( Valve::details )
-            .forEach( System.out::println );
-        // System.out.println(AA);
         
-        List<Valve> toOpen = valves.stream()
-            .filter( v -> v.flow > 0 )
-            .collect( Collectors.toList() );
+        // names.forEach(System.out::println);
         
+        ArrayList<String> backTrace = new ArrayList<>(); 
+        int totalFlow = dfs( names.indexOf("AA"), 
+            flows.keySet().stream().filter(k -> flows.get(k) > 0 ).toList(),
+            30,
+            backTrace
+        );
         
-        valves.forEach( v -> v.maxFlow = 0 );
-        toOpen.forEach( v -> flow(v, State.MAX_TIME) );
+        System.out.println(backTrace);
         
-        Valve current = AA;
-        int totalFlow = 0;
-        int timeLeft = State.MAX_TIME;
-        outter:
-        while ( timeLeft > 0 ) {
-            
-            Integer max = current.maxFlow;
-            current.maxFlow = 0;
-            // Valve next = current;
-            do {
-                Valve next = current.tunnels.stream()
-                    .map( byName::get )
-                    .sorted( Comparator.comparingInt((Valve v) -> v.maxFlow).reversed() )
-                    .map( v -> {
-                        System.out.println("  "+v+" > "+v.maxFlow);
-                        return v;
-                    })
-                    .toList()
-                    .get(0);
-                
-                
-                if ( next.maxFlow == 0 ) break outter;
-                if ( next.maxFlow <= max ) break;
-
-                timeLeft--;
-
-                
-                System.out.println("  Move to " + next + " ("+next.maxFlow+")");
-                current = next;
-            } while(timeLeft > 0);
-            
-            if (!toOpen.contains(current)) {
-                System.out.println("no open ?");
-                break;
-            }
-            else {
-                timeLeft--;
-                int addedFlow = timeLeft * current.flow;
-                System.out.println("Opened " + current + " (+"+addedFlow+")");
-                toOpen.remove(current);
-                totalFlow += addedFlow;
-            }
-            
-            valves.forEach( v -> v.maxFlow = 0 );
-            final int _timeLeft = timeLeft;
-            toOpen.forEach( v -> flow(v, _timeLeft) );
-        }
-        
-        
+        // 1952 xxx
         System.out.println();
         System.out.println("PART1 ====> " + totalFlow);
-
+        
+        System.out.println();
+        System.out.println("hitcache => "+hitCache);
     }
     
-    
-    private void flow(Valve from, int timeLeft) {
-        
-        Set<Valve> toVisit = new HashSet<>( );
-        Set<Valve> visited = new HashSet<>( );
-        int sum = from.flow * timeLeft;
-        toVisit.add(from);
-        mins.put(from.name, 0);
-        
-        while ( !toVisit.isEmpty() ) {
-            sum -= from.flow;
-            if ( sum <= 0 ) {
-                return;
-            }
-            final int _sum = sum;
-            toVisit.forEach( v -> v.maxFlow += _sum );
-            visited.addAll(toVisit);
-            toVisit = toVisit.stream()
-                .flatMap( v -> v.tunnels.stream() )
-                .map( byName::get )
-                .filter( Predicate.not(visited::contains) )
-                .collect( Collectors.toSet() ); 
+    long hitCache = 0;
+    HashMap<Entry, Integer> dfsMem = new HashMap<>();
+    String pad = "  ";
+    private int dfs(int idx, List<String> lst, int time, List<String> backTrace) {
+        Entry e = new Entry(idx, lst, time);
+        /* */
+        if ( dfsMem.get(e) != null ) {
+            hitCache++;
+            return dfsMem.get(e);
         }
-        
-    }
-    
-    private State bestCandidate(State state, List<Valve> toOpen) {
-        int bestFlow = 0;
-        State candidate = state.copy();
-        for ( Valve goHere : toOpen ) {
-            int timeLeft = state.timeLeft 
-                    - getTimeTo( state.location, goHere, state.timeLeft )  // time to move
-                    - 1; // time to open
-            if (timeLeft < 0) continue;
-            int flowToAdd = timeLeft * goHere.flow;
-            if ( flowToAdd > bestFlow ) {
-                bestFlow = flowToAdd;
-                candidate.location = goHere;
-                candidate.totalFlow = state.totalFlow + flowToAdd;
-                candidate.timeLeft = timeLeft;
+        /* */
+        int res = 0;
+        if ( time > 0 ) {
+            String nextMax = "";
+            // pad = pad + "  ";
+            List<String> subList = Collections.emptyList();
+            List<String> maxList = Collections.emptyList();
+            backTrace.add(names.get(idx));
+            for (String r : lst) {
+                int j = names.indexOf(r);
+                int timeLeft = (time - grid[idx][j] - 1);
+                if ( timeLeft <= 0 ) continue;
+                List<String> rest = new ArrayList<>(lst);
+                rest.remove(r);
+                subList = new ArrayList<>();
+                int flow = flows.get(r) * timeLeft;
+                if ( !rest.isEmpty() ) flow += dfs( names.indexOf(r), rest, timeLeft, subList);
+                if ( flow > res ) {
+                    maxList = subList;
+                    res = flow;
+                    nextMax = r;
+                }
             }
+            if ( res > 0 && !nextMax.isEmpty() ) {
+                backTrace.addAll(maxList);
+                // System.out.println(pad + "Next " + nextMax + " at " + (time - grid[idx][names.indexOf(nextMax)]) + " for " + res );
+            }
+            // pad = pad.substring(2);
         }
-        return bestFlow == 0 ? null : candidate;
-    }
-    
-    
-    /**
-     * Works for sample, but too complex for real DATA. Complexity O(n!) (= 87,178,291,200 permutations)
-     */
-    private int bestAllCandidate(List<Valve> toOpen) {
-        int permutationI = 0;
-        int bestFlow = 0;
-        List<Valve> bestList = null;
-        for(List<Valve> perm : AdventDay.permutations(toOpen)) {
-            permutationI++;
-            if (permutationI % 100 == 0)
-                System.out.println( "--- permutation #" + permutationI +" ---" );
-            // System.out.println( "  | " +perm.stream().map(v -> v.name).toList());
-            int flow = 0;
-            int timeLeft = State.MAX_TIME;
-            Valve from = AA;
-            for ( Valve goHere : perm ) {
-                timeLeft = timeLeft 
-                        - getTimeTo( from, goHere, timeLeft )  // time to move
-                        - 1; // time to open
-                if (timeLeft < 0) break;
-                flow += timeLeft * goHere.flow;
-                from = goHere;
-            }
-            if ( flow > bestFlow ) {
-                bestFlow = flow;
-                System.out.println("  * Best flow -> " + bestFlow );
-                bestList = new LinkedList<>( perm );
-                
-            }
-        }
-        System.out.println("[[ Best flow : " + bestFlow);
-        System.out.println("[[ List      : " + bestList.stream().map(v -> v.name).toList());
-        return bestFlow;
+        dfsMem.put(e, res);
+        return res;
     }
 
-    Map<String, Integer> mins = new HashMap<>();
-    private int getTimeTo(Valve from, Valve to, int timeLeft) {
-        mins = new HashMap<>();
-        
-        Set<Valve> toVisit = new HashSet<>( );
-        Set<Valve> visited = new HashSet<>( );
-        
-        int sum = 0;
-        toVisit.add(from);
-        mins.put(from.name, 0);
-        
-        while ( !toVisit.isEmpty() ) {
-            Valve current = toVisit.iterator().next();
-            toVisit.remove(current);
-            sum = mins.get(current.name) + 1;
-            visited.add(current);
-            if ( sum > timeLeft ) continue;
-            for(String valveName : current.tunnels) {
-                Valve valve = byName.get(valveName);
-                final int _sum = sum;
-                mins.compute( valve.name, (k,v) -> {
-                    if ( v == null ) return _sum;
-                    return Math.min(v, _sum);
-                });
-                if (!visited.contains(valve)) toVisit.add(valve);
-            }
-        }
-        
-        /*
-        System.out.println();
-        mins.forEach( (k,v) -> {
-            System.out.println(k+": "+v);
-        });
-        System.out.println();
-        */
-        
-        return Optional.ofNullable( mins.get(to.name) )
-                .orElse( Integer.MAX_VALUE );
-    }
+    static record Entry(int idx, List<String> from, int time) {} 
+    
 
     public void part2() throws IOException {
         
