@@ -29,40 +29,40 @@ public class Day20 implements AdventDay {
     }
 
     public void part1() throws IOException {
-        int size = lines.size();
         ArrayList<Integer> indexes = new ArrayList<>(4000);
+        int size = lines.size();  
         for (int i = 0; i < size; i++) {
             indexes.add(i);
         }
         int delta = 0;
+        int size2 = size-1; // when remove one element ...
         for (int i = 0; i < size; i++) {
             int idelta = (i + delta) % size;
             while ( indexes.get(idelta) != i ) {
                 delta = (delta + 1) % size;
                 idelta = (i + delta) % size;
             }
-            int val = lines.get(idelta);
+            int val = lines.remove(idelta);
+            indexes.remove(idelta);
+
             int nidx = idelta;
             
             if ( val < 0 ) {
                 for (int j = 0; j < Math.abs(val); j++) {
                     nidx--;
-                    if (nidx<0) nidx += size;
+                    if (nidx<0) nidx += size2;
                 }
-                if ( nidx == 0 ) nidx = size;
+                if ( nidx == 0 ) nidx = size2;
             } else {
-                for (int j = 0; j <= Math.abs(val); j++) {
+                for (int j = 0; j < Math.abs(val); j++) {
                     nidx++;
-                    if (nidx>size) nidx -= size;
+                    if (nidx>size2) nidx -= size2;
                 }
-                if (nidx == size) nidx = 0;
+                if (nidx == size2) nidx = 0;
             }
             
             lines.add(nidx, val);
             indexes.add(nidx, i);
-            if (nidx < idelta) idelta++;
-            lines.remove(idelta);
-            indexes.remove(idelta);
             
             
             /*
@@ -97,7 +97,8 @@ public class Day20 implements AdventDay {
         
         // -5520 xxx
         // -8370 xxx
-        
+        // -5447 xxx
+        // 988 IS OK !!
         System.out.println( sum );
         
     }
