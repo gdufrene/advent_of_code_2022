@@ -32,7 +32,6 @@ public class Day16 implements AdventDay {
     HashMap<String, List<String>> conn = new HashMap<>();
     LinkedList<String> toOpens = new LinkedList<>();
     int[][] grid;
-    Valve AA;
     
     private Day16 load(String f) throws IOException {
         Files.lines( dayFile(f) )
@@ -158,60 +157,7 @@ public class Day16 implements AdventDay {
     public void part2() throws IOException {
         
     }
-    
-    
-    public static class State {
-        static int MAX_TIME = 30;
-        
-        int timeLeft = MAX_TIME;
-        int totalFlow = 0;
-        Valve location;
-        public State(Valve location) {
-            this.location = location;
-        }
-        State copy() {
-            State s = new State(location);
-            s.timeLeft = timeLeft;
-            s.totalFlow = totalFlow;
-            return s;
-        }
-    }
-    
-    public static class Valve {
-        private static final Pattern valvePattern = Pattern.compile(
-            "Valve ([A-Z]*) has flow rate=(\\d+); tunnel[s]? lead[s]? to valve[s]? (.*)"
-        );
 
-        String name;
-        int flow;
-        List<String> tunnels;
-        
-        int maxFlow;
-        
-        public static Valve fromString(String str) {
-            Matcher m = valvePattern.matcher(str);
-            if ( !m.matches() ) throw new RuntimeException("Error in input " + str);
-            Valve v = new Valve();
-            v.name=m.group(1);
-            v.flow = parseInt(m.group(2));
-            v.tunnels = Stream.of( m.group(3).split(",") )
-                    .map( String::trim )
-                    .toList();
-            return v;
-        }
-        
-        @Override
-        public String toString() {
-            return name;
-                    //String.format("[%s] .: %03d :.  >> %s", name, flow, next);
-        }
-        
-        public String details() {
-            return String.format("[%s] .: %03d :.  >> %s", name, flow, tunnels);
-        }
-        
-    }
-    
     
 }
 
